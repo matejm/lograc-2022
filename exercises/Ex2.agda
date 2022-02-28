@@ -101,13 +101,31 @@ postulate
 -}
 
 +-identityʳ : (n : ℕ) → n + zero ≡ n
-+-identityʳ n = {!!}
++-identityʳ zero =
+   begin
+      zero + zero ≡⟨⟩
+      zero
+   ∎
++-identityʳ (suc n) = begin
+      suc (n + zero) ≡⟨ cong suc (+-identityʳ n) ⟩
+      suc n
+   ∎
 
 +-identityˡ : (n : ℕ) → zero + n ≡ n
-+-identityˡ n = {!!}
++-identityˡ zero = begin
+      zero + zero ≡⟨⟩
+      zero
+   ∎
++-identityˡ (suc n) = begin
+      suc (zero + n) ≡⟨ cong suc (+-identityˡ n) ⟩
+      suc n
+   ∎
 
 +-suc : (n m : ℕ) → n + (suc m) ≡ suc (n + m)
-+-suc n m = {!!}
+-- +-suc zero m = +-identityˡ (suc m)
+-- bl simpl ker se vse poracuna
++-suc zero m = refl
++-suc (suc n) m = cong suc (+-suc n m)
 
 
 ----------------
@@ -141,7 +159,10 @@ data Maybe (A : Set) : Set where
   nothing : Maybe A
 
 lookup : {A : Set} {n : ℕ} → Vec A n → ℕ → Maybe A
-lookup xs i = {!!}
+lookup [] zero = nothing
+lookup (x ∷ xs) zero = just x
+lookup [] (suc i) = nothing
+lookup (x ∷ xs) (suc i) = lookup xs i
 
 
 ----------------
@@ -179,7 +200,8 @@ lookup-totalᵀ : {n : ℕ}
               → i < n                           -- `i` in `{0,1,...,n-1}`
               → lookup xs i ≡ just ⋆
              
-lookup-totalᵀ xs i p = {!!}
+lookup-totalᵀ (⋆ ∷ xs) zero p = cong just refl
+lookup-totalᵀ (x ∷ xs) (suc i) (s≤s p) = lookup-totalᵀ xs i p
 
 {-
    Note: In the standard library, `⊤` is defined as a record type. Here
@@ -218,7 +240,8 @@ data Fin : ℕ → Set where
   suc  : {n : ℕ} (i : Fin n) → Fin (suc n)
 
 safe-lookup : {A : Set} {n : ℕ} → Vec A n → Fin n → A
-safe-lookup xs i = {!!}
+safe-lookup (x ∷ xs) zero = x
+safe-lookup (x ∷ xs) (suc i) = safe-lookup xs i
 
 
 ----------------
@@ -238,8 +261,9 @@ safe-lookup xs i = {!!}
    the correct type, the yellow highlighting below will disappear.
 -}
 
-nat-to-fin : {!!}
-nat-to-fin = {!!}
+nat-to-fin : {n : ℕ} → (i : ℕ) → (p : i < n) → Fin n
+nat-to-fin zero (s≤s p) = zero
+nat-to-fin (suc i) (s≤s p) = suc (nat-to-fin i p)
 
 lookup-correct : {A : Set} {n : ℕ}
                → (xs : Vec A n)
@@ -247,7 +271,8 @@ lookup-correct : {A : Set} {n : ℕ}
                → (p : i < n)
                → lookup xs i ≡ just (safe-lookup xs (nat-to-fin i p))
 
-lookup-correct x i p = {!!}
+lookup-correct (x ∷ xs) zero (s≤s p) = refl
+lookup-correct (x ∷ xs) (suc i) (s≤s p) = lookup-correct xs i p
 
 
 ----------------
@@ -260,7 +285,8 @@ lookup-correct x i p = {!!}
 -}
 
 take-n : {A : Set} {n m : ℕ} → Vec A (n + m) → Vec A n
-take-n xs = {!!}
+take-n {n = zero} xs = []
+take-n {n = suc n} (x ∷ xs) = x ∷ (take-n xs)
 
 
 ----------------
@@ -273,9 +299,17 @@ take-n xs = {!!}
    by recursion. Use `take-n` and equational reasoning instead.
 -}
 
-take-n' : {A : Set} {n m : ℕ} → Vec A (m + n) → Vec A n
-take-n' xs = {!!}
++-com : (m n : ℕ) -> m + n ≡ n + m
++-com m zero = +-identityʳ m
++-com m (suc n) = begin 
+   m + (suc n) ≡⟨ +-suc m n ⟩
+   suc (m + n) ≡⟨ cong suc (+-com m n) ⟩
+   suc (n + m) 
+   ∎ 
 
+-- TODO bomo naslednjic
+take-n' : {A : Set} {n m : ℕ} → Vec A (m + n) → Vec A n
+take-n' {A = A} {n = n} {m = m} xs = take-n (subst (Vec A) (+-com m n) xs)
 
 ----------------
 -- Exercise 7 --
@@ -287,7 +321,8 @@ take-n' xs = {!!}
 -}
 
 vec-list : {A : Set} {n : ℕ} → Vec A n → List A
-vec-list xs = {!!}
+vec-list [] = []
+vec-list (x ∷ xs) = x ∷ vec-list xs
 
 {-
    Define a function from lists to vectors that is identity on the
@@ -297,8 +332,9 @@ vec-list xs = {!!}
    natural number specifying the length of the returned vector.
 -}
 
-list-vec : {A : Set} → (xs : List A) → Vec A {!!}
-list-vec xs = {!!}
+list-vec : {A : Set} → (xs : List A) → Vec A (length xs)
+list-vec [] = []
+list-vec (x ∷ xs) = x ∷ (list-vec xs)
 
 
 ----------------
@@ -314,7 +350,8 @@ vec-list-length : {A : Set} {n : ℕ}
                 → (xs : Vec A n)
                 → n ≡ length (vec-list xs)
                 
-vec-list-length xs = {!!}
+vec-list-length [] = refl
+vec-list-length (x ∷ xs) = cong suc (vec-list-length xs) 
 
 
 ----------------
@@ -343,8 +380,14 @@ Matrix A m n = Vec (Vec A n) m
    of two vectors of the same length.
 -}
 
+-- Vector addition
+_+ⱽ_ : {n : ℕ} → Vec ℕ n -> Vec ℕ n -> Vec ℕ n
+[] +ⱽ [] = []
+(x ∷ v) +ⱽ (y ∷ u) = (x + y) ∷ (u +ⱽ v) 
+
 _+ᴹ_ : {m n : ℕ} → Matrix ℕ m n → Matrix ℕ m n → Matrix ℕ m n
-xss +ᴹ yss = {!!}
+[] +ᴹ [] = []
+(xs ∷ xss) +ᴹ (ys ∷ yss) = (xs +ⱽ ys) ∷ (xss +ᴹ yss)
 
 
 -----------------------------
