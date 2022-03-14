@@ -22,7 +22,7 @@ open import Data.List            using (List; []; _∷_; _++_; length; map)
 open import Data.List.Properties using (map-id; map-compose)
 open import Data.Maybe           using (Maybe; nothing; just)
 open import Data.Nat             using (ℕ; zero; suc; _+_; _≤_; z≤n; s≤s; _<_)
-open import Data.Nat.Properties  using (+-identityˡ; +-identityʳ; +-suc; +-comm)
+open import Data.Nat.Properties  using (+-identityˡ; +-identityʳ; +-suc; +-comm; suc-injective)
 open import Data.Product         using (Σ; _,_; proj₁; proj₂; Σ-syntax; _×_)
 open import Data.Sum             using (_⊎_; inj₁; inj₂)
 open import Data.Vec             using (Vec; []; _∷_)
@@ -68,7 +68,8 @@ postulate fun-ext : ∀ {a b} → Extensionality a b
 -}
 
 take-n : {A : Set} {n m : ℕ} → Vec A (n + m) → Vec A n
-take-n xs = {!!}
+take-n {n = zero} {m = m} xs = []
+take-n {n = suc n} {m = m} (x ∷ xs) = x ∷ (take-n xs)
 
 {-
    Now define a function that extracts the first `n` elements from a
@@ -82,7 +83,7 @@ take-n xs = {!!}
 -}
 
 take-n' : {A : Set} {n m : ℕ} → Vec A (m + n) → Vec A n
-take-n' xs = {!!}
+take-n' {A} {n} {m} xs = take-n (subst (Vec A) (+-comm m n)  xs)
 
 
 ----------------
@@ -117,7 +118,11 @@ list-vec (x ∷ xs) = x ∷ list-vec xs
 list-vec-list : {A : Set}
               → vec-list ∘ list-vec ≡ id {A = List A}
 
-list-vec-list = {!!}
+list-vec-list = fun-ext list-vec-list-aux
+   where
+      list-vec-list-aux : {A : Set} → (xs : List A) → (vec-list ∘ list-vec) xs ≡ id xs
+      list-vec-list-aux [] = refl
+      list-vec-list-aux (x ∷ xs) = cong (x ∷_) (list-vec-list-aux xs) 
 
 {-
    Note: The dual lemma, showing that `list-vec` is the left inverse
@@ -155,7 +160,8 @@ lookup-total-Σ : {A : Set} {n : ℕ}
                → i < n
                → Σ[ x ∈ A ] (lookup xs i ≡ just x)
 
-lookup-total-Σ xs i p = {!!}
+lookup-total-Σ (x ∷ xs) zero p = x , refl
+lookup-total-Σ (x ∷ xs) (suc i) (s≤s p) = lookup-total-Σ xs i p
 
 
 ----------------
@@ -173,8 +179,9 @@ lookup-total-Σ xs i p = {!!}
 -}
 
 vec-list-Σ : {A : Set} {n : ℕ} → Vec A n → Σ[ xs ∈ List A ] (length xs ≡ n)
-vec-list-Σ xs = {!!}
-
+vec-list-Σ [] = [] , refl
+vec-list-Σ (x ∷ xs) with (vec-list-Σ xs) 
+... | xs' , p = x ∷ xs' , cong suc p
 
 ----------------
 -- Exercise 5 --
@@ -199,8 +206,15 @@ list-ext : {A : Set} {xs ys : List A}
               → safe-list-lookup xs i p ≡ safe-list-lookup ys i q)
          → xs ≡ ys
 
-list-ext = {!!}
-
+list-ext {xs = []} {ys = []} same-len p = refl
+list-ext {xs = x ∷ xs} {ys = y ∷ ys} same-len safe = 
+   begin
+   x ∷ xs
+   ≡⟨ cong (_∷ xs) (safe zero (s≤s z≤n) (s≤s z≤n)) ⟩ -- pokazes da je xs = ys
+   y ∷ xs 
+   ≡⟨ cong (y ∷_) (list-ext (suc-injective same-len) λ i p q → safe (suc i) (s≤s p)  (s≤s q)) ⟩ -- pokazes da je x == y
+   y ∷ ys
+   ∎
 {-
    Notice that we have generalised this statement a bit compared
    to what one would have likely written down in the first place.
@@ -250,7 +264,12 @@ open _≃_
           ≃
           Σ[ xy ∈ Σ[ x ∈ A ] (B x) ] (C (proj₁ xy) (proj₂ xy))
         
-Σ-assoc = {!!}
+Σ-assoc = record {
+   to = λ (x , y , z) → ((x , y) , z) ;
+   from = λ ((x , y) , z) → (x , y , z) ;
+   from∘to = λ _ → refl ;
+   to∘from = λ _ → refl
+   }
 
 {-
    Second, prove the same thing using copatterns. For a reference on copatterns,
@@ -262,7 +281,10 @@ open _≃_
           ≃
           Σ[ xy ∈ Σ[ x ∈ A ] (B x) ] (C (proj₁ xy) (proj₂ xy))
 
-Σ-assoc' = {!!}
+to Σ-assoc' = λ (x , y , z) → ((x , y) , z)
+from Σ-assoc' = λ ((x , y) , z) → (x , y , z)
+from∘to Σ-assoc' = λ _ → refl
+to∘from Σ-assoc' = λ _ → refl
 
 
 ----------------
@@ -277,7 +299,27 @@ open _≃_
 -}
 
 ≃-List : {A B : Set} → A ≃ B → List A ≃ List B
-≃-List = {!!}
+≃-List record { to = eq-to ; from = eq-from ; from∘to = eq-from∘to ; to∘from = eq-to∘from } = record {
+   to = map eq-to ;
+   from = map eq-from ;
+   from∘to = λ x → begin
+      map eq-from (map eq-to x)
+      ≡⟨ sym (map-compose x) ⟩
+      map (eq-from ∘ eq-to) x
+      ≡⟨ cong (λ f → map f x) (fun-ext eq-from∘to) ⟩
+      map id x
+      ≡⟨ map-id x ⟩
+      x ∎
+      ;
+   to∘from = λ x → begin
+      map eq-to (map eq-from x)
+      ≡⟨ sym (map-compose x) ⟩
+      map (eq-to ∘ eq-from) x
+      ≡⟨ cong (λ f → map f x) (fun-ext eq-to∘from) ⟩
+      map id x
+      ≡⟨ map-id x ⟩
+      x ∎
+   }
 
 
 ----------------
@@ -305,8 +347,19 @@ open DecSet
 -}
 
 DecList : (DS : DecSet) → Σ[ DS' ∈ DecSet ] (DSet DS' ≡ List (DSet DS))
-DecList DS = {!!}
-
+DecList DS = (record {
+   DSet = List (DSet DS) ;
+   test-≡ = t
+   }) , refl
+   where
+      t : (x y : List (DSet DS)) → Dec (x ≡ y)
+      t [] [] = yes refl
+      t [] (x ∷ y) = no (λ ())
+      t (x ∷ xs) [] = no (λ ())
+      t (x ∷ xs) (y ∷ ys) with (t xs ys) | ((test-≡ DS) x y)
+      ...                    | yes refl | yes refl = yes refl
+      ...                    | yes refl | no q = no λ {refl → q refl}
+      ...                    | no f | _ = no λ {refl → f refl}
 
 ----------------
 -- Exercise 9 --
@@ -375,20 +428,17 @@ data _∈_ {A : Set} : A → List A → Set where
   ∈-there : {x y : A} {xs : List A} → x ∈ xs → x ∈ (y ∷ xs)
 
 data NoDup {A : Set} : List A → Set where
-  {- EXERCISE: replace this comment with constructors for `NoDup` -}
-
-{-
-   Next, prove some sanity-checks about the correctness of `NoDup`.
--}
+   nodup-empty : NoDup []
+   nodup-list : {x : A} {xs : List A} → NoDup xs → ¬(x ∈ xs) → NoDup (x ∷ xs)
 
 nodup-test₁ : NoDup {ℕ} []
-nodup-test₁ = {!!}
+nodup-test₁ = nodup-empty
 
 nodup-test₂ : NoDup (4 ∷ 2 ∷ [])
-nodup-test₂ = {!!}
+nodup-test₂ = nodup-list (nodup-list nodup-empty λ {()}) λ {(∈-there ())}
 
 nodup-test₃ : ¬ (NoDup (4 ∷ 2 ∷ 4 ∷ []))
-nodup-test₃ = {!!}
+nodup-test₃ = λ { (nodup-list x x₁) → x₁ (∈-there ∈-here)}
 
 {-
    Finally, prove that `add` preserves the no-duplicates property.
@@ -402,8 +452,17 @@ add-nodup : {DS : DecSet} → (xs : List (DSet DS)) → (x : DSet DS)
           → NoDup {DSet DS} xs
           → NoDup {DSet DS} (add {DS} xs x)
 
-add-nodup xs x' p = {!!}
-
+add-nodup [] x' p = nodup-list nodup-empty λ {()}
+add-nodup {DS} (x ∷ xs) x' (nodup-list p q) with (test-≡ DS) x x' 
+...                                       | yes refl = nodup-list p λ {u → q u}
+...                                       | no f = nodup-list (add-nodup xs x' p) (q ∘ ze-not xs f)
+   where
+      ze-not : {x x' : DSet DS} → (xs : List (DSet DS))
+                 → x ≢ x'
+                 → x ∈ add {DS} xs x'
+                 → x ∈ xs
+      ze-not {x} {.x} [] razlicna ∈-here = {! razlicna !}
+      ze-not {x} {x'} (x₁ ∷ xs) razlicna p = {!   !}
 
 -----------------
 -- Exercise 10 --
@@ -462,3 +521,4 @@ open import Data.Nat.Properties
 
 from-bin-≡ : (b : Bin) → from-bin b ≡ from-bin' b
 from-bin-≡ b = {!!}
+ 
